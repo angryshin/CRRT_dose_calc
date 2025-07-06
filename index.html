@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRRT 용량 계산기</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- 헤더 -->
+        <div class="card header-card">
+            <div class="header-content">
+                <div class="header-left">
+                    <span class="material-icons header-icon">calculate</span>
+                    <div class="header-text">
+                        <h1>CRRT 용량 계산기</h1>
+                        <p>임상용 연속신대체요법 처방 계산기</p>
+                    </div>
+                </div>
+                <button class="clear-all-btn" onclick="clearAllData()">
+                    <span class="material-icons">clear</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 환자 정보 -->
+        <div class="card patient-card">
+            <div class="card-header">
+                <h2>환자 정보</h2>
+                <button class="clear-section-btn" onclick="clearPatientData()">
+                    <span class="material-icons">clear</span>
+                </button>
+            </div>
+            <div class="input-row">
+                <div class="input-group">
+                    <label>체중 (Body weight) (kg)</label>
+                    <input type="number" id="weight" step="0.1" min="0.1" max="500" placeholder="예: 70">
+                    <div class="error-message" id="weight-error"></div>
+                </div>
+                <div class="input-group">
+                    <label>헤마토크릿 (Hematocrit) (%)</label>
+                    <input type="number" id="hematocrit" step="0.1" min="0" max="100" placeholder="예: 30">
+                    <div class="error-message" id="hematocrit-error"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 처방 파라미터 -->
+        <div class="card prescription-card">
+            <div class="card-header">
+                <h2>처방 파라미터</h2>
+                <button class="clear-section-btn" onclick="clearPrescriptionData()">
+                    <span class="material-icons">clear</span>
+                </button>
+            </div>
+            <div class="input-group">
+                <label>혈류량 (Blood flow) (mL/min)</label>
+                <input type="number" id="bloodFlowRate" step="1" min="1" max="500" placeholder="예: 150">
+                <div class="error-message" id="bloodFlowRate-error"></div>
+            </div>
+            <div class="input-group">
+                <label>전희석 (Pre-dilution) (mL/hr)</label>
+                <input type="number" id="preDilution" step="1" min="0" max="5000" placeholder="예: 1000">
+                <div class="error-message" id="preDilution-error"></div>
+            </div>
+            <div class="input-group">
+                <label>후희석 (Post-dilution) (mL/hr)</label>
+                <input type="number" id="postDilution" step="1" min="0" max="5000" placeholder="예: 300">
+                <div class="error-message" id="postDilution-error"></div>
+            </div>
+            <div class="input-group">
+                <label>투석액 (Dialysate) (mL/hr)</label>
+                <input type="number" id="dialysate" step="1" min="0" max="5000" placeholder="예: 1200">
+                <div class="error-message" id="dialysate-error"></div>
+            </div>
+            <div class="input-group">
+                <label>순수 수분 제거 (Net UF) (mL/hr)</label>
+                <input type="number" id="ultraFiltration" step="1" min="0" max="2000" placeholder="예: 100">
+                <div class="error-message" id="ultraFiltration-error"></div>
+            </div>
+            <div class="input-row">
+                <div class="input-group">
+                    <label>실제 가동시간 (Actual runtime) (hr)</label>
+                    <input type="number" id="actualRuntime" step="0.1" min="0" max="168" placeholder="예: 24">
+                    <div class="error-message" id="actualRuntime-error"></div>
+                </div>
+                <div class="input-group">
+                    <label>처방 시간 (Prescribed time) (hr)</label>
+                    <input type="number" id="prescribedTime" step="0.1" min="1" max="168" placeholder="예: 24">
+                    <div class="error-message" id="prescribedTime-error"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 계산 결과 -->
+        <div class="card results-card">
+            <h2>계산 결과</h2>
+            <div class="results-grid">
+                <div class="result-item">
+                    <span class="result-label">혈장 유량 (Plasma flow rate)</span>
+                    <span class="result-value" id="plasmaFlow">0 mL/hr</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">처방 용량 (Effluent dose)</span>
+                    <span class="result-value" id="effluentDose">0.0 mL/kg/hr</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">여과분율 (Filtration fraction)</span>
+                    <span class="result-value" id="filtrationFraction">0.0%</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">희석인자 (Dilution factor)</span>
+                    <span class="result-value" id="dilutionFactor">0.000</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">실제 전달 용량 (Delivered dose)</span>
+                    <span class="result-value" id="actualDeliveredDose">0.0 mL/kg/hr</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 경고 및 알림 -->
+        <div class="card warnings-card" id="warningsCard" style="display: none;">
+            <h2>경고 및 알림</h2>
+            <div id="warningsContainer"></div>
+        </div>
+
+        <!-- 권장 범위 -->
+        <div class="card recommendations-card">
+            <h2>권장 범위</h2>
+            <div class="recommendations-list">
+                <div class="recommendation-item">
+                    <span class="material-icons check-icon">check_circle</span>
+                    <span>처방 용량: 20-30 mL/kg/hr (권장: 25-30)</span>
+                </div>
+                <div class="recommendation-item">
+                    <span class="material-icons check-icon">check_circle</span>
+                    <span>여과분율: ≤ 25%</span>
+                </div>
+                <div class="recommendation-item">
+                    <span class="material-icons check-icon">check_circle</span>
+                    <span>혈류량: 100-200 mL/min</span>
+                </div>
+                <div class="recommendation-item">
+                    <span class="material-icons check-icon">check_circle</span>
+                    <span>희석인자: 0.75-0.9 (최적)</span>
+                </div>
+            </div>
+            <div class="guideline-note">
+                가이드라인에서는 20~25 mL/kg/hr가 실제로 환자에게 전달되도록, 처방 시에는 이보다 10~20% 높게(예: 25~30 mL/kg/hr) 설정할 것을 권고합니다.
+            </div>
+        </div>
+
+        <!-- 희석인자 해석 -->
+        <div class="card dilution-guide-card">
+            <h2>희석인자 해석</h2>
+            <div class="dilution-guide">
+                <div class="dilution-item optimal">
+                    <div class="dilution-color"></div>
+                    <div class="dilution-text">
+                        <div class="dilution-range">0.75-0.9 (최적)</div>
+                        <div class="dilution-desc">청소 효율과 필터 수명의 최적 균형</div>
+                    </div>
+                </div>
+                <div class="dilution-item caution">
+                    <div class="dilution-color"></div>
+                    <div class="dilution-text">
+                        <div class="dilution-range">0.7-0.75 (주의)</div>
+                        <div class="dilution-desc">청소 효율 감소 가능성, 모니터링 필요</div>
+                    </div>
+                </div>
+                <div class="dilution-item danger">
+                    <div class="dilution-color"></div>
+                    <div class="dilution-text">
+                        <div class="dilution-range">&lt;0.7 (위험)</div>
+                        <div class="dilution-desc">심각한 청소 효율 저하, 즉시 조정 필요</div>
+                    </div>
+                </div>
+                <div class="dilution-item warning">
+                    <div class="dilution-color"></div>
+                    <div class="dilution-text">
+                        <div class="dilution-range">&gt;0.9 (주의)</div>
+                        <div class="dilution-desc">필터 막힘 위험 증가, 필터 수명 단축</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 계산 과정 상세 -->
+        <div class="card calculation-steps-card">
+            <div class="card-header">
+                <span class="material-icons">calculate</span>
+                <h2>계산 과정 상세</h2>
+            </div>
+            <div id="calculationStepsContainer"></div>
+        </div>
+
+        <!-- 액션 버튼 -->
+        <div class="action-buttons">
+            <button class="btn btn-primary" onclick="copyPrescription()">
+                <span class="material-icons">content_copy</span>
+                처방 복사
+            </button>
+        </div>
+
+        <!-- 지우기 버튼들 -->
+        <div class="clear-buttons">
+            <button class="btn btn-outline" onclick="clearPatientData()">
+                <span class="material-icons">clear</span>
+                환자 정보 지우기
+            </button>
+            <button class="btn btn-outline" onclick="clearPrescriptionData()">
+                <span class="material-icons">clear</span>
+                처방 정보 지우기
+            </button>
+        </div>
+
+        <!-- 면책 조항 -->
+        <div class="card disclaimer-card">
+            <p>주의: 본 계산기는 교육 및 참고 목적으로만 사용하시기 바랍니다. 실제 임상 결정은 반드시 담당 의료진과 상의하여 내리시기 바랍니다.</p>
+        </div>
+    </div>
+
+    <!-- 확인 다이얼로그 -->
+    <div id="confirmDialog" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="dialogTitle"></h3>
+            <p id="dialogMessage"></p>
+            <div class="modal-buttons">
+                <button class="btn btn-danger" id="confirmBtn"></button>
+                <button class="btn btn-secondary" onclick="closeDialog()">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
