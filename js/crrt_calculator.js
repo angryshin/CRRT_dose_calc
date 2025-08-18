@@ -59,11 +59,7 @@ class CRRTCalculator {
             saveBtn.addEventListener('click', () => this.saveData());
         }
 
-        // 가이드 버튼
-        const guideBtn = document.getElementById('guideBtn');
-        if (guideBtn) {
-            guideBtn.addEventListener('click', () => this.showGuideModal());
-        }
+        // 가이드 버튼 제거됨 - 사이드바 메뉴에서만 접근 가능
 
         // 사이드바 메뉴 이벤트
         this.setupSidebarMenuEvents();
