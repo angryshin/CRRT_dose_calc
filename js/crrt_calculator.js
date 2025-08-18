@@ -6,6 +6,7 @@ class CRRTCalculator {
         this.inputFields = {};
         this.results = {};
         this.calculationSteps = {};
+        this.warnings = [];
         this.isAutoSaveEnabled = true;
         this.initializeApp();
     }
@@ -155,6 +156,221 @@ class CRRTCalculator {
         }
     }
 
+    // 경고 및 알림 검사
+    checkWarnings() {
+        this.warnings = [];
+        const weight = this.getInputValue('weight');
+        const prescribedTime = this.getInputValue('prescribedTime');
+        const bloodFlowRate = this.getInputValue('bloodFlowRate');
+        const effluentDose = this.results.effluentDose || 0;
+        const filtrationFraction = this.results.filtrationFraction || 0;
+        const actualDeliveredDose = this.results.actualDeliveredDose || 0;
+        const dilutionFactor = this.results.dilutionFactor || 0;
+
+        // 기본 입력 검증
+        if (weight <= 0) {
+            this.warnings.push({
+                type: 'error',
+                message: '체중은 0보다 커야 합니다 (현재: ' + weight + ' kg)',
+                solution: '유효한 체중을 입력하세요 (0.1~500 kg)'
+            });
+        }
+
+        if (prescribedTime <= 0) {
+            this.warnings.push({
+                type: 'error',
+                message: '처방 시간은 0보다 커야 합니다',
+                solution: '유효한 처방 시간을 입력하세요'
+            });
+        }
+
+        // 권장 범위 검증
+        if (effluentDose > 0 && effluentDose < 25) {
+            this.warnings.push({
+                type: 'warning',
+                message: '처방 용량이 권장 범위(25-30 mL/kg/hr)보다 낮습니다: ' + effluentDose.toFixed(1) + ' mL/kg/hr',
+                solution: '환자 상태에 따라 25-30 mL/kg/hr로 조정을 고려하세요'
+            });
+        }
+
+        if (filtrationFraction > 25) {
+            this.warnings.push({
+                type: 'error',
+                message: '여과분율이 권장 한계(25%)를 초과합니다: ' + filtrationFraction.toFixed(1) + '%',
+                solution: '여과분율을 25% 이하로 조정하세요'
+            });
+        }
+
+        if (actualDeliveredDose > 0 && actualDeliveredDose < 20) {
+            this.warnings.push({
+                type: 'warning',
+                message: '실제 전달 용량이 부족합니다: ' + actualDeliveredDose.toFixed(1) + ' mL/kg/hr',
+                solution: '운행 시간을 늘리거나 처방을 조정하세요'
+            });
+        }
+
+        if (bloodFlowRate > 0 && bloodFlowRate < 100) {
+            this.warnings.push({
+                type: 'warning',
+                message: '혈류량이 권장 범위(100-200 mL/min)보다 낮습니다: ' + bloodFlowRate + ' mL/min',
+                solution: '혈류량을 100 mL/min 이상으로 조정하세요'
+            });
+        }
+
+        if (bloodFlowRate > 200) {
+            this.warnings.push({
+                type: 'warning',
+                message: '혈류량이 권장 범위(100-200 mL/min)를 초과합니다: ' + bloodFlowRate + ' mL/min',
+                solution: '혈류량을 200 mL/min 이하로 조정하세요'
+            });
+        }
+
+        // 희석인자 해석
+        if (dilutionFactor > 0) {
+            if (dilutionFactor < 0.75) {
+                this.warnings.push({
+                    type: 'danger',
+                    message: '희석인자가 위험 수준입니다: ' + dilutionFactor.toFixed(3),
+                    solution: '전희석을 대폭 줄이거나 혈류량을 늘려 희석인자를 0.75 이상으로 조정하세요. 심각한 청소 효율 저하가 예상됩니다.'
+                });
+            } else if (dilutionFactor < 0.85) {
+                this.warnings.push({
+                    type: 'warning',
+                    message: '희석인자가 주의 수준입니다: ' + dilutionFactor.toFixed(3),
+                    solution: '전희석을 줄이거나 혈류량을 늘려 희석인자를 0.85 이상으로 조정하세요. 청소 효율 저하 가능성이 있습니다.'
+                });
+            } else if (dilutionFactor < 0.90) {
+                this.warnings.push({
+                    type: 'info',
+                    message: '희석인자가 적정 범위입니다: ' + dilutionFactor.toFixed(3),
+                    solution: '현재 설정이 적절합니다. 필요시 0.90-0.93 범위로 조정을 고려하세요.'
+                });
+            } else if (dilutionFactor <= 0.93) {
+                this.warnings.push({
+                    type: 'success',
+                    message: '희석인자가 최적 범위입니다: ' + dilutionFactor.toFixed(3),
+                    solution: '현재 설정이 최적입니다. 청소 효율과 필터 수명의 이상적인 균형을 제공합니다.'
+                });
+            } else {
+                this.warnings.push({
+                    type: 'warning',
+                    message: '희석인자가 주의 수준입니다: ' + dilutionFactor.toFixed(3),
+                    solution: '전희석을 늘려 희석인자를 0.93 이하로 조정하세요. 필터 막힘 위험이 증가할 수 있습니다.'
+                });
+            }
+        }
+    }
+
+    // 희석인자 해석 가져오기
+    getDilutionFactorInterpretation() {
+        const dilutionFactor = this.results.dilutionFactor || 0;
+        const bloodFlowRate = this.getInputValue('bloodFlowRate') || 0;
+        const preDilution = this.getInputValue('preDilution') || 0;
+        
+        if (dilutionFactor <= 0) {
+            return {
+                status: 'error',
+                title: '계산 불가',
+                description: '입력값이 부족하여 희석인자를 계산할 수 없습니다.',
+                recommendation: '혈류량과 전희석 값을 입력하세요.',
+                details: `현재 입력값: 혈류량 ${bloodFlowRate} mL/min, 전희석 ${preDilution} mL/hr`
+            };
+        }
+        
+        // 업로드된 가이드에 따른 새로운 해석 기준
+        if (dilutionFactor >= 0.90 && dilutionFactor <= 0.93) {
+            return {
+                status: 'success',
+                title: '최적 (Optimal)',
+                description: '청소 효율과 필터 수명의 가장 이상적인 균형을 제공합니다.',
+                recommendation: '현재 설정을 유지하세요. 이는 가장 효율적인 치료 조건입니다.',
+                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.90-0.93) ✓`
+            };
+        }
+        
+        if (dilutionFactor >= 0.85 && dilutionFactor < 0.90) {
+            return {
+                status: 'success',
+                title: '적정 (Appropriate)',
+                description: '양호한 청소 효율을 제공하며, 임상적으로 적절한 범위입니다.',
+                recommendation: '현재 설정이 적절합니다. 필요시 0.90-0.93 범위로 조정을 고려하세요.',
+                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.90-0.93)`
+            };
+        }
+        
+        if (dilutionFactor >= 0.75 && dilutionFactor < 0.85) {
+            return {
+                status: 'warning',
+                title: '주의 (Caution)',
+                description: '청소 효율 저하 가능성이 있으며, 조정 검토가 필요합니다.',
+                recommendation: '전희석을 줄이거나 혈류량을 늘려 희석인자를 0.85 이상으로 조정하세요.',
+                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.90-0.93)`
+            };
+        }
+        
+        if (dilutionFactor < 0.75) {
+            return {
+                status: 'danger',
+                title: '위험 (Danger)',
+                description: '심각한 청소 효율 저하가 예상되며, 즉시 조정이 필요합니다.',
+                recommendation: '전희석을 대폭 줄이거나 혈류량을 늘려 희석인자를 0.75 이상으로 조정하세요.',
+                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.90-0.93)`
+            };
+        }
+        
+        if (dilutionFactor > 0.93) {
+            return {
+                status: 'warning',
+                title: '주의 (Caution)',
+                description: '필터 막힘 위험이 증가하고 필터 수명이 단축될 수 있습니다.',
+                recommendation: '전희석을 늘려 희석인자를 0.93 이하로 조정하세요.',
+                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.90-0.93)`
+            };
+        }
+        
+        return {
+            status: 'info',
+            title: '기타',
+            description: '현재 희석인자에 대한 추가 평가가 필요합니다.',
+            recommendation: '의료진과 상의하여 적절한 조정을 결정하세요.',
+            details: `현재 희석인자: ${dilutionFactor.toFixed(3)}`
+        };
+    }
+
+    // 권장 범위 정보 가져오기
+    getRecommendedRanges() {
+        return {
+            effluentDose: {
+                min: 25,
+                max: 35,
+                unit: 'mL/kg/hr',
+                description: '일반적인 CRRT 처방 용량 범위',
+                note: '환자 상태에 따라 조정이 필요할 수 있습니다.'
+            },
+            filtrationFraction: {
+                min: 0,
+                max: 25,
+                unit: '%',
+                description: '여과분율 권장 한계',
+                note: '25% 초과 시 혈전 형성 위험이 증가합니다.'
+            },
+            bloodFlowRate: {
+                min: 100,
+                max: 200,
+                unit: 'mL/min',
+                description: '혈류량 권장 범위',
+                note: '체중과 환자 상태에 따라 조정하세요.'
+            },
+            dilutionFactor: {
+                min: 0.90,
+                max: 0.93,
+                unit: '',
+                description: '희석인자 최적 범위 (청소 효율과 필터 수명의 이상적 균형)',
+                note: '0.90-0.93이 가장 효율적인 치료를 제공합니다.'
+            }
+        };
+    }
+
     // 계산 실행
     calculate() {
         try {
@@ -172,9 +388,15 @@ class CRRTCalculator {
             this.calculateDilutionFactor();
             this.calculateActualDeliveredDose();
 
+            // 경고 및 알림 검사
+            this.checkWarnings();
+
             // 결과 표시
             this.displayResults();
             this.displayCalculationSteps();
+            this.displayWarnings();
+            this.displayDilutionFactorInterpretation();
+            this.displayRecommendedRanges();
 
             // 자동 저장
             if (this.isAutoSaveEnabled) {
@@ -195,11 +417,13 @@ class CRRTCalculator {
         const plasmaFlow = bloodFlowRate * 60 * (1 - hematocrit / 100);
         
         this.results.plasmaFlow = plasmaFlow;
+        this.results.bloodFlowRate = bloodFlowRate; // 혈류량을 results에 저장
         this.calculationSteps.plasmaFlow = {
             formula: '혈장 유량 = 혈류량 × 60 × (1 - 헤마토크릿/100)',
-            values: `혈장 유량 = ${bloodFlowRate} × 60 × (1 - ${hematocrit}/100)`,
+            values: `혈장 유량 = ${bloodFlowRate} mL/min × 60 × (1 - ${hematocrit}%) = ${bloodFlowRate} × 60 × ${(1 - hematocrit / 100).toFixed(3)}`,
             result: plasmaFlow.toFixed(2),
-            unit: 'mL/hr'
+            unit: 'mL/hr',
+            note: `혈류량: ${bloodFlowRate} mL/min, 헤마토크릿: ${hematocrit}%`
         };
     }
 
@@ -272,6 +496,7 @@ class CRRTCalculator {
     calculateDilutionFactor() {
         const plasmaFlow = this.results.plasmaFlow;
         const preDilution = this.getInputValue('preDilution');
+        const bloodFlowRate = this.getInputValue('bloodFlowRate');
         
         const denominator = plasmaFlow + preDilution;
         
@@ -292,9 +517,10 @@ class CRRTCalculator {
         this.results.dilutionFactor = dilutionFactor;
         this.calculationSteps.dilutionFactor = {
             formula: '희석인자 = Plasma Flow / (Plasma Flow + Pre-dilution)',
-            values: `희석인자 = ${plasmaFlow.toFixed(2)} / (${plasmaFlow.toFixed(2)} + ${preDilution})`,
+            values: `희석인자 = ${plasmaFlow.toFixed(2)} / (${plasmaFlow.toFixed(2)} + ${preDilution}) = ${plasmaFlow.toFixed(2)} / ${denominator.toFixed(2)}`,
             result: dilutionFactor.toFixed(3),
-            unit: ''
+            unit: '',
+            note: `혈류량: ${bloodFlowRate} mL/min → 혈장 유량: ${plasmaFlow.toFixed(2)} mL/hr, 전희석: ${preDilution} mL/hr`
         };
     }
 
@@ -388,6 +614,140 @@ class CRRTCalculator {
             
             stepsContent.innerHTML = stepsHTML;
         }
+    }
+
+    // 경고 및 알림 표시
+    displayWarnings() {
+        const warningsSection = document.getElementById('warningsSection');
+        if (!warningsSection) return;
+
+        if (this.warnings.length === 0) {
+            warningsSection.style.display = 'none';
+            return;
+        }
+
+        warningsSection.style.display = 'block';
+        warningsSection.classList.add('fade-in');
+
+        let warningsHTML = '';
+        this.warnings.forEach(warning => {
+            const alertClass = `alert-${warning.type === 'error' ? 'danger' : warning.type}`;
+            warningsHTML += `
+                <div class="alert ${alertClass}">
+                    <div class="alert-header">
+                        <strong>${this.getWarningTypeText(warning.type)}</strong>
+                    </div>
+                    <div class="alert-message">${warning.message}</div>
+                    ${warning.solution ? `<div class="alert-solution">💡 ${warning.solution}</div>` : ''}
+                </div>
+            `;
+        });
+
+        warningsSection.innerHTML = warningsHTML;
+    }
+
+    // 경고 타입 텍스트 변환
+    getWarningTypeText(type) {
+        const typeMap = {
+            'error': '오류 (Error)',
+            'warning': '경고 (Warning)',
+            'info': '정보 (Info)',
+            'danger': '위험 (Danger)',
+            'success': '성공 (Success)'
+        };
+        return typeMap[type] || type;
+    }
+
+    // 희석인자 해석 표시
+    displayDilutionFactorInterpretation() {
+        const interpretationSection = document.getElementById('dilutionFactorInterpretationSection');
+        if (!interpretationSection) return;
+
+        const interpretation = this.getDilutionFactorInterpretation();
+        
+        interpretationSection.style.display = 'block';
+        interpretationSection.classList.add('fade-in');
+
+        const statusClass = `interpretation-${interpretation.status}`;
+        interpretationSection.innerHTML = `
+            <div class="interpretation-card ${statusClass}">
+                <div class="interpretation-header">
+                    <h6>희석인자 해석 (Dilution Factor Interpretation)</h6>
+                    <span class="interpretation-status">${interpretation.title}</span>
+                </div>
+                <div class="interpretation-content">
+                    <p><strong>설명:</strong> ${interpretation.description}</p>
+                    <p><strong>권장사항:</strong> ${interpretation.recommendation}</p>
+                    ${interpretation.details ? `<p><strong>상세:</strong> ${interpretation.details}</p>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    // 권장 범위 표시
+    displayRecommendedRanges() {
+        const rangesSection = document.getElementById('recommendedRangesSection');
+        if (!rangesSection) return;
+
+        const ranges = this.getRecommendedRanges();
+        
+        rangesSection.style.display = 'block';
+        rangesSection.classList.add('fade-in');
+
+        let rangesHTML = '<h6>권장 범위 (Recommended Ranges)</h6>';
+        rangesHTML += '<div class="ranges-grid">';
+        
+        Object.entries(ranges).forEach(([key, range]) => {
+            let currentValue = 0;
+            
+            // 혈류량은 입력값에서 직접 가져오기
+            if (key === 'bloodFlowRate') {
+                currentValue = this.getInputValue('bloodFlowRate');
+            } else if (key === 'effluentDose') {
+                // 처방 용량은 실제 전달 용량으로 표시
+                currentValue = this.results.actualDeliveredDose || 0;
+            } else {
+                currentValue = this.results[key] || 0;
+            }
+            
+            const isInRange = currentValue >= range.min && currentValue <= range.max;
+            const statusClass = isInRange ? 'range-ok' : 'range-warning';
+            
+            rangesHTML += `
+                <div class="range-item ${statusClass}">
+                    <div class="range-header">
+                        <span class="range-name">${this.getRangeName(key)}</span>
+                        <span class="range-status">${isInRange ? '✓' : '⚠'}</span>
+                    </div>
+                    <div class="range-values">
+                        <span class="range-min">${range.min}</span>
+                        <span class="range-separator">-</span>
+                        <span class="range-max">${range.max}</span>
+                        <span class="range-unit">${range.unit}</span>
+                    </div>
+                    <div class="range-current">
+                        현재값: <strong>${currentValue.toFixed(2)} ${range.unit}</strong>
+                        ${key === 'effluentDose' ? '<br><small class="text-muted">(실제 전달 용량)</small>' : ''}
+                    </div>
+                    <div class="range-description">${range.description}</div>
+                    <div class="range-note">${range.note}</div>
+                </div>
+            `;
+        });
+        
+        rangesHTML += '</div>';
+        rangesSection.innerHTML = rangesHTML;
+    }
+
+    // 범위 이름 변환
+    getRangeName(key) {
+        const nameMap = {
+            'effluentDose': '처방 용량 (Prescribed Dose)',
+            'filtrationFraction': '여과분율 (Filtration Fraction)',
+            'bloodFlowRate': '혈류량 (Blood Flow Rate)',
+            'dilutionFactor': '희석인자 (Dilution Factor)'
+        };
+        return nameMap[key] || key;
     }
 
     // 가이드 테이블 생성
@@ -525,13 +885,20 @@ class CRRTCalculator {
 
             this.results = {};
             this.calculationSteps = {};
+            this.warnings = []; // 초기화 시 경고도 초기화
 
             // 결과 섹션 숨기기
             const resultsSection = document.getElementById('resultsSection');
             const stepsSection = document.getElementById('calculationStepsSection');
+            const warningsSection = document.getElementById('warningsSection');
+            const dilutionFactorInterpretationSection = document.getElementById('dilutionFactorInterpretationSection');
+            const recommendedRangesSection = document.getElementById('recommendedRangesSection');
             
             if (resultsSection) resultsSection.style.display = 'none';
             if (stepsSection) stepsSection.style.display = 'none';
+            if (warningsSection) warningsSection.style.display = 'none';
+            if (dilutionFactorInterpretationSection) dilutionFactorInterpretationSection.style.display = 'none';
+            if (recommendedRangesSection) recommendedRangesSection.style.display = 'none';
 
             // 로컬 스토리지 클리어
             localStorage.removeItem('crrt_calculator_data');
