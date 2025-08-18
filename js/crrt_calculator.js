@@ -8,6 +8,7 @@ class CRRTCalculator {
         this.calculationSteps = {};
         this.warnings = [];
         this.isAutoSaveEnabled = true;
+        this.calculationTimeout = null; // 디바운싱을 위한 타이머
         this.initializeApp();
     }
 
@@ -31,10 +32,19 @@ class CRRTCalculator {
             const element = document.getElementById(id);
             if (element) {
                 this.inputFields[id] = element;
-                // 입력값 변경 시 자동 저장
+                // 입력값 변경 시 자동 저장 및 계산
                 element.addEventListener('input', () => {
                     if (this.isAutoSaveEnabled) {
-                        this.saveData();
+                        this.saveData(false); // 자동 저장 시에는 팝업 표시 안함
+                    }
+                    // 입력값 변경 시 자동 계산 (체중이 입력된 경우에만)
+                    const weight = this.getInputValue('weight');
+                    if (weight > 0) {
+                        // 디바운싱을 위해 약간의 지연 후 계산 실행
+                        clearTimeout(this.calculationTimeout);
+                        this.calculationTimeout = setTimeout(() => {
+                            this.calculate();
+                        }, 500);
                     }
                 });
             }
@@ -400,7 +410,7 @@ class CRRTCalculator {
 
             // 자동 저장
             if (this.isAutoSaveEnabled) {
-                this.saveData();
+                this.saveData(false); // 자동 저장 시에는 팝업 표시 안함
             }
 
         } catch (error) {
@@ -828,7 +838,7 @@ class CRRTCalculator {
     }
 
     // 데이터 저장
-    saveData() {
+    saveData(showAlert = true) {
         try {
             const data = {
                 timestamp: new Date().toISOString(),
@@ -842,10 +852,16 @@ class CRRTCalculator {
             });
 
             localStorage.setItem('crrt_calculator_data', JSON.stringify(data));
-            this.showAlert('데이터가 저장되었습니다.', 'success');
+            
+            // 수동 저장 시에만 알림 표시
+            if (showAlert) {
+                this.showAlert('데이터가 저장되었습니다.', 'success');
+            }
         } catch (error) {
             console.error('데이터 저장 오류:', error);
-            this.showAlert('데이터 저장에 실패했습니다.', 'error');
+            if (showAlert) {
+                this.showAlert('데이터 저장에 실패했습니다.', 'error');
+            }
         }
     }
 
@@ -870,6 +886,12 @@ class CRRTCalculator {
                 }
 
                 this.showAlert('저장된 데이터를 불러왔습니다.', 'info');
+                
+                // 자동 계산 실행 (입력값이 있는 경우)
+                const weight = this.getInputValue('weight');
+                if (weight > 0) {
+                    setTimeout(() => this.calculate(), 100);
+                }
             }
         } catch (error) {
             console.error('데이터 로드 오류:', error);
@@ -879,6 +901,12 @@ class CRRTCalculator {
     // 모든 데이터 초기화
     clearAll() {
         if (confirm('모든 입력값과 결과를 초기화하시겠습니까?')) {
+            // 진행 중인 계산 타이머 정리
+            if (this.calculationTimeout) {
+                clearTimeout(this.calculationTimeout);
+                this.calculationTimeout = null;
+            }
+            
             Object.keys(this.inputFields).forEach(fieldId => {
                 this.setInputValue(fieldId, '');
             });
