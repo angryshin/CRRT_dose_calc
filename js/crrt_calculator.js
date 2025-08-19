@@ -198,8 +198,8 @@ class CRRTCalculator {
         if (effluentDose > 0 && effluentDose < 25) {
             this.warnings.push({
                 type: 'warning',
-                message: '처방 용량이 권장 범위(25-30 mL/kg/hr)보다 낮습니다: ' + effluentDose.toFixed(1) + ' mL/kg/hr',
-                solution: '환자 상태에 따라 25-30 mL/kg/hr로 조정을 고려하세요'
+                message: '처방 용량이 권장 범위(25-35 mL/kg/hr)보다 낮습니다: ' + effluentDose.toFixed(1) + ' mL/kg/hr',
+                solution: '환자 상태에 따라 25-35 mL/kg/hr로 조정을 고려하세요'
             });
         }
 
@@ -235,7 +235,8 @@ class CRRTCalculator {
             });
         }
 
-        // 희석인자 해석
+        // 희석인자 해석은 getDilutionFactorInterpretation 함수에서 통합 처리
+        // 위험/경고 수준만 경고로 추가
         if (dilutionFactor > 0) {
             if (dilutionFactor < 0.75) {
                 this.warnings.push({
@@ -249,19 +250,7 @@ class CRRTCalculator {
                     message: '희석인자가 주의 수준입니다: ' + dilutionFactor.toFixed(3),
                     solution: '전희석을 줄이거나 혈류량을 늘려 희석인자를 0.85 이상으로 조정하세요. 청소 효율 저하 가능성이 있습니다.'
                 });
-            } else if (dilutionFactor < 0.90) {
-                this.warnings.push({
-                    type: 'info',
-                    message: '희석인자가 적정 범위입니다: ' + dilutionFactor.toFixed(3),
-                    solution: '현재 설정이 적절합니다. 필요시 0.90-0.93 범위로 조정을 고려하세요.'
-                });
-            } else if (dilutionFactor <= 0.93) {
-                this.warnings.push({
-                    type: 'success',
-                    message: '희석인자가 최적 범위입니다: ' + dilutionFactor.toFixed(3),
-                    solution: '현재 설정이 최적입니다. 청소 효율과 필터 수명의 이상적인 균형을 제공합니다.'
-                });
-            } else {
+            } else if (dilutionFactor > 0.93) {
                 this.warnings.push({
                     type: 'warning',
                     message: '희석인자가 주의 수준입니다: ' + dilutionFactor.toFixed(3),
@@ -291,20 +280,20 @@ class CRRTCalculator {
         if (dilutionFactor >= 0.90 && dilutionFactor <= 0.93) {
             return {
                 status: 'success',
-                title: '최적 (Optimal)',
+                title: '최적 권장 범위 (Optimal Recommended Range)',
                 description: '청소 효율과 필터 수명의 가장 이상적인 균형을 제공합니다.',
                 recommendation: '현재 설정을 유지하세요. 이는 가장 효율적인 치료 조건입니다.',
-                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.90-0.93) ✓`
+                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.85-0.93) ✓`
             };
         }
         
         if (dilutionFactor >= 0.85 && dilutionFactor < 0.90) {
             return {
                 status: 'success',
-                title: '적정 (Appropriate)',
+                title: '권장 범위 (Recommended Range)',
                 description: '양호한 청소 효율을 제공하며, 임상적으로 적절한 범위입니다.',
                 recommendation: '현재 설정이 적절합니다. 필요시 0.90-0.93 범위로 조정을 고려하세요.',
-                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.90-0.93)`
+                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.85-0.93)`
             };
         }
         
@@ -314,7 +303,7 @@ class CRRTCalculator {
                 title: '주의 (Caution)',
                 description: '청소 효율 저하 가능성이 있으며, 조정 검토가 필요합니다.',
                 recommendation: '전희석을 줄이거나 혈류량을 늘려 희석인자를 0.85 이상으로 조정하세요.',
-                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.90-0.93)`
+                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.85-0.93)`
             };
         }
         
@@ -324,7 +313,7 @@ class CRRTCalculator {
                 title: '위험 (Danger)',
                 description: '심각한 청소 효율 저하가 예상되며, 즉시 조정이 필요합니다.',
                 recommendation: '전희석을 대폭 줄이거나 혈류량을 늘려 희석인자를 0.75 이상으로 조정하세요.',
-                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.90-0.93)`
+                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.85-0.93)`
             };
         }
         
@@ -334,7 +323,7 @@ class CRRTCalculator {
                 title: '주의 (Caution)',
                 description: '필터 막힘 위험이 증가하고 필터 수명이 단축될 수 있습니다.',
                 recommendation: '전희석을 늘려 희석인자를 0.93 이하로 조정하세요.',
-                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.90-0.93)`
+                details: `현재 희석인자: ${dilutionFactor.toFixed(3)} (권장: 0.85-0.93)`
             };
         }
         
@@ -375,7 +364,7 @@ class CRRTCalculator {
                 min: 0.90,
                 max: 0.93,
                 unit: '',
-                description: '희석인자 최적 범위 (청소 효율과 필터 수명의 이상적 균형)',
+                description: '희석인자 최적 권장 범위 (청소 효율과 필터 수명의 이상적 균형)',
                 note: '0.90-0.93이 가장 효율적인 치료를 제공합니다.'
             }
         };
@@ -755,7 +744,7 @@ class CRRTCalculator {
             'effluentDose': '처방 용량 (Prescribed Dose)',
             'filtrationFraction': '여과분율 (Filtration Fraction)',
             'bloodFlowRate': '혈류량 (Blood Flow Rate)',
-            'dilutionFactor': '희석인자 (Dilution Factor)'
+            'dilutionFactor': '희석인자 권장 범위 (Dilution Factor Recommended Range)'
         };
         return nameMap[key] || key;
     }
